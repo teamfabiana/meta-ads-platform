@@ -1,0 +1,124 @@
+{% extends "layout.html" %}
+{% block title %}Connect Meta Ads{% endblock %}
+{% block content %}
+
+<div class="p-8 max-w-2xl">
+  <div class="mb-8">
+    <h1 class="text-2xl font-bold text-white">Connect Meta Ads</h1>
+    <p class="text-gray-400 text-sm mt-1">Link your Facebook/Instagram Ads account to start getting insights</p>
+  </div>
+
+  {% if connection %}
+  <!-- Connected state -->
+  <div class="card rounded-2xl p-6 mb-6 border border-green-500/20">
+    <div class="flex items-center gap-4 mb-4">
+      <div class="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <div>
+        <h3 class="font-semibold text-white">Account Connected</h3>
+        <p class="text-sm text-gray-400">{{ connection.fb_user_name }} · {{ connection.ad_account_name }}</p>
+      </div>
+      <span class="ml-auto badge-active px-3 py-1 rounded-full text-xs font-medium">Active</span>
+    </div>
+    <div class="grid grid-cols-2 gap-4 text-sm mb-5">
+      <div class="bg-white/5 rounded-xl p-3">
+        <div class="text-xs text-gray-500 mb-1">Ad Account ID</div>
+        <div class="text-white font-mono text-xs">{{ connection.ad_account_id }}</div>
+      </div>
+      <div class="bg-white/5 rounded-xl p-3">
+        <div class="text-xs text-gray-500 mb-1">Last Synced</div>
+        <div class="text-white text-xs">{{ connection.last_synced.strftime('%b %d, %Y %I:%M %p') if connection.last_synced else 'Never' }}</div>
+      </div>
+      <div class="bg-white/5 rounded-xl p-3">
+        <div class="text-xs text-gray-500 mb-1">Connected Since</div>
+        <div class="text-white text-xs">{{ connection.connected_at.strftime('%b %d, %Y') }}</div>
+      </div>
+      <div class="bg-white/5 rounded-xl p-3">
+        <div class="text-xs text-gray-500 mb-1">Token Status</div>
+        <div class="{% if connection.is_valid() %}text-green-400{% else %}text-red-400{% endif %} text-xs font-medium">
+          {% if connection.is_valid() %}Valid{% else %}Expired — Reconnect{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <form method="POST" action="/sync">
+        <button type="submit" class="btn-primary text-white text-sm font-medium px-4 py-2.5 rounded-xl flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Sync Now
+        </button>
+      </form>
+      <form method="POST" action="/disconnect" onsubmit="return confirm('Disconnect this Meta Ads account?')">
+        <button type="submit" class="bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-medium px-4 py-2.5 rounded-xl transition-all">
+          Disconnect
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Switch account -->
+  <div class="card rounded-2xl p-6">
+    <h3 class="font-semibold text-white mb-2">Switch or reconnect account</h3>
+    <p class="text-sm text-gray-400 mb-4">Connect a different Meta Ads account or refresh your access token.</p>
+    <a href="{{ oauth_url }}" class="btn-meta inline-flex items-center gap-2 text-white font-medium px-5 py-2.5 rounded-xl text-sm">
+      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+      Reconnect with Facebook
+    </a>
+  </div>
+
+  {% else %}
+  <!-- Not connected -->
+  <div class="card rounded-2xl p-8 mb-6">
+    <div class="flex items-start gap-4 mb-6">
+      <div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+        <svg class="w-6 h-6 text-blue-400" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+      </div>
+      <div>
+        <h3 class="font-semibold text-white text-lg mb-1">Connect with Facebook</h3>
+        <p class="text-gray-400 text-sm">Authorize MetaInsights to read your ad account data. We request read-only access.</p>
+      </div>
+    </div>
+
+    <div class="space-y-3 mb-7">
+      {% for item in [
+        ('ads_read', 'Read your campaign performance metrics'),
+        ('ads_management', 'Access campaign structure and settings'),
+        ('business_management', 'View your Business Manager accounts'),
+      ] %}
+      <div class="flex items-center gap-3 text-sm text-gray-400">
+        <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <span><strong class="text-gray-300 font-mono text-xs">{{ item[0] }}</strong> — {{ item[1] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <a href="{{ oauth_url }}" class="btn-meta inline-flex items-center gap-3 text-white font-semibold px-6 py-3.5 rounded-xl text-sm">
+      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+      Continue with Facebook
+    </a>
+  </div>
+
+  <!-- How it works -->
+  <div class="card rounded-2xl p-6">
+    <h3 class="font-semibold text-white mb-4 text-sm">How it works</h3>
+    <div class="space-y-4">
+      {% for step, title, desc in [
+        ('1', 'Authorize with Facebook', 'You\'ll be redirected to Facebook to grant read-only access to your Ads account.'),
+        ('2', 'Select your Ad Account', 'Choose which ad account you want to analyze. You can switch later.'),
+        ('3', 'Sync your campaigns', 'We pull the last 30 days of campaign data from the Meta Marketing API.'),
+        ('4', 'Get AI insights', 'Claude analyzes your data and generates actionable recommendations.'),
+      ] %}
+      <div class="flex gap-4">
+        <div class="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold flex-shrink-0">{{ step }}</div>
+        <div>
+          <div class="text-sm font-medium text-white">{{ title }}</div>
+          <div class="text-xs text-gray-500 mt-0.5">{{ desc }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

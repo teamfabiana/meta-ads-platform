@@ -1,0 +1,180 @@
+{% extends "layout.html" %}
+{% block title %}AI Analysis{% endblock %}
+{% block content %}
+
+<div class="p-8">
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-bold text-white">AI Analysis</h1>
+      <p class="text-gray-400 text-sm mt-1">Claude-powered insights and recommendations for your Meta Ads</p>
+    </div>
+    {% if connection %}
+    <form method="POST" action="/analysis/generate">
+      <button type="submit" class="btn-primary flex items-center gap-2 text-white text-sm font-medium px-5 py-2.5 rounded-xl">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Generate New Analysis
+      </button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if not connection %}
+  <div class="card rounded-2xl p-12 text-center max-w-lg mx-auto mt-16">
+    <div class="w-16 h-16 rounded-full bg-indigo-500/20 flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+    </div>
+    <h3 class="text-lg font-semibold mb-2">Connect your Meta Ads account first</h3>
+    <p class="text-gray-400 text-sm mb-6">You need to connect and sync your Meta Ads account before generating AI analysis.</p>
+    <a href="/connect" class="btn-meta inline-flex items-center gap-2 text-white font-medium px-6 py-3 rounded-xl">Connect Account</a>
+  </div>
+
+  {% elif not report %}
+  <div class="card rounded-2xl p-12 text-center max-w-lg mx-auto mt-8">
+    <div class="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+    </div>
+    <h3 class="text-lg font-semibold mb-2">No analysis yet</h3>
+    <p class="text-gray-400 text-sm mb-6">Click "Generate New Analysis" to get AI-powered insights powered by Claude.</p>
+    <form method="POST" action="/analysis/generate">
+      <button type="submit" class="btn-primary inline-flex items-center gap-2 text-white font-medium px-6 py-3 rounded-xl">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Generate Analysis
+      </button>
+    </form>
+  </div>
+
+  {% else %}
+
+  <!-- Score + Summary row -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+    <!-- Score ring -->
+    <div class="card rounded-2xl p-6 flex flex-col items-center justify-center text-center">
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-4">Account Health Score</p>
+      <div class="relative w-36 h-36 mb-4">
+        <svg class="w-full h-full -rotate-90" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="10"/>
+          <circle cx="60" cy="60" r="50" fill="none"
+            stroke="{% if report.score >= 75 %}#4ade80{% elif report.score >= 50 %}#facc15{% else %}#f87171{% endif %}"
+            stroke-width="10" stroke-linecap="round"
+            stroke-dasharray="314"
+            stroke-dashoffset="{{ 314 - (314 * report.score / 100) }}"
+            class="score-ring"/>
+        </svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center">
+          <span class="text-4xl font-bold text-white">{{ report.score }}</span>
+          <span class="text-xs text-gray-400">/ 100</span>
+        </div>
+      </div>
+      <span class="text-lg font-semibold {% if report.score >= 75 %}text-green-400{% elif report.score >= 50 %}text-yellow-400{% else %}text-red-400{% endif %}">
+        {{ report.score_label }}
+      </span>
+      <p class="text-xs text-gray-500 mt-2">{{ report.date_range }}</p>
+      <p class="text-xs text-gray-600 mt-1">Generated {{ report.created_at.strftime('%b %d, %Y %I:%M %p') }}</p>
+    </div>
+
+    <!-- Key metrics assessment -->
+    <div class="card rounded-2xl p-6 lg:col-span-2">
+      <h3 class="text-sm font-semibold text-gray-300 mb-4">Performance Assessment</h3>
+      {% if report.key_metrics_assessment %}
+      <div class="space-y-3">
+        {% for key, val in report.key_metrics_assessment.items() %}
+        <div class="flex items-start gap-3">
+          <div class="flex-shrink-0 w-2 h-2 rounded-full mt-2
+            {% if val.rating == 'high' %}bg-green-400{% elif val.rating == 'medium' %}bg-yellow-400{% else %}bg-red-400{% endif %}">
+          </div>
+          <div>
+            <span class="text-sm font-medium text-white capitalize">{{ key.replace('_',' ') }}</span>
+            <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium
+              {% if val.rating == 'high' %}bg-green-500/20 text-green-400{% elif val.rating == 'medium' %}bg-yellow-500/20 text-yellow-400{% else %}bg-red-500/20 text-red-400{% endif %}">
+              {{ val.rating|capitalize }}
+            </span>
+            <p class="text-xs text-gray-500 mt-0.5">{{ val.note }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Executive Summary -->
+  <div class="card rounded-2xl p-6 mb-6">
+    <h3 class="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+      <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      Executive Summary
+    </h3>
+    <div class="text-gray-300 text-sm leading-relaxed space-y-3 prose prose-invert max-w-none">
+      {{ report.summary | safe }}
+    </div>
+  </div>
+
+  <!-- Quick Wins -->
+  {% if report.quick_wins %}
+  <div class="card rounded-2xl p-6 mb-6">
+    <h3 class="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+      <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      Quick Wins — Do These Today
+    </h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {% for win in report.quick_wins %}
+      <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
+        <p class="text-sm text-yellow-200">{{ win }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Recommendations -->
+  {% if report.recommendations %}
+  <div class="card rounded-2xl p-6 mb-6">
+    <h3 class="text-sm font-semibold text-gray-300 mb-5 flex items-center gap-2">
+      <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+      Top Recommendations
+    </h3>
+    <div class="space-y-4">
+      {% for i, rec in enumerate(report.recommendations) %}
+      <div class="bg-white/5 border border-white/10 rounded-xl p-5">
+        <div class="flex items-start gap-4">
+          <div class="flex-shrink-0 w-8 h-8 rounded-full btn-primary flex items-center justify-center text-sm font-bold">
+            {{ i + 1 }}
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-2">
+              <h4 class="text-white font-semibold text-sm">{{ rec.title }}</h4>
+              {% if rec.priority %}
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium
+                {% if rec.priority == 'high' %}bg-red-500/20 text-red-400{% elif rec.priority == 'medium' %}bg-yellow-500/20 text-yellow-400{% else %}bg-blue-500/20 text-blue-400{% endif %}">
+                {{ rec.priority|capitalize }} Priority
+              </span>
+              {% endif %}
+            </div>
+            <p class="text-xs text-gray-500 mb-2"><span class="text-gray-400 font-medium">Issue:</span> {{ rec.issue }}</p>
+            <p class="text-xs text-gray-400 mb-2"><span class="text-white font-medium">Action:</span> {{ rec.action }}</p>
+            <p class="text-xs text-green-400"><span class="font-medium">Expected impact:</span> {{ rec.impact }}</p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Budget Optimization -->
+  {% if report.budget_optimization %}
+  <div class="card rounded-2xl p-6">
+    <h3 class="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+      <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Budget Optimization
+    </h3>
+    <div class="text-gray-300 text-sm leading-relaxed prose prose-invert max-w-none">
+      {{ report.budget_optimization | safe }}
+    </div>
+  </div>
+  {% endif %}
+
+  {% endif %}
+</div>
+
+{% endblock %}

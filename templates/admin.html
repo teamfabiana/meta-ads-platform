@@ -1,0 +1,185 @@
+{% extends "layout.html" %}
+{% block title %}Admin — Users{% endblock %}
+{% block content %}
+
+<div class="p-8">
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-bold text-white">User Management</h1>
+      <p class="text-gray-400 text-sm mt-1">{{ user_data|length }} registered user{{ 's' if user_data|length != 1 }}</p>
+    </div>
+  </div>
+
+  <!-- Stats row -->
+  <div class="grid grid-cols-3 gap-4 mb-8">
+    {% set total = user_data|length %}
+    {% set connected = user_data | selectattr('connection') | list | length %}
+    {% set admins = user_data | selectattr('user.is_admin') | list | length %}
+    {% for label, val, color in [
+      ('Total Users', total, 'text-indigo-400'),
+      ('Connected to Meta Ads', connected, 'text-blue-400'),
+      ('Admins', admins, 'text-purple-400'),
+    ] %}
+    <div class="metric-card rounded-2xl p-5">
+      <div class="text-xs text-gray-500 uppercase tracking-wide mb-2">{{ label }}</div>
+      <div class="text-3xl font-bold {{ color }}">{{ val }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Search -->
+  <div class="card rounded-2xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-white/10 flex items-center gap-3">
+      <input id="searchInput" oninput="filterUsers()" placeholder="Search by name or email…"
+        class="flex-1 bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500" />
+      <span class="text-xs text-gray-500" id="countLabel">{{ user_data|length }} users</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm" id="usersTable">
+        <thead>
+          <tr class="text-xs text-gray-500 uppercase tracking-wide border-b border-white/10 bg-white/5">
+            <th class="text-left px-6 py-3">User</th>
+            <th class="text-left px-6 py-3">Joined</th>
+            <th class="text-left px-6 py-3">Meta Ads Account</th>
+            <th class="text-center px-6 py-3">Reports</th>
+            <th class="text-center px-6 py-3">Role</th>
+            <th class="text-right px-6 py-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5" id="userTableBody">
+          {% for row in user_data %}
+          {% set u = row.user %}
+          {% set conn = row.connection %}
+          <tr class="table-row user-row" data-search="{{ u.name|lower }} {{ u.email|lower }}">
+            <td class="px-6 py-4">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0
+                  {% if u.is_admin %}bg-purple-500/30 text-purple-300{% else %}bg-indigo-500/20 text-indigo-300{% endif %}">
+                  {{ u.name[0].upper() }}
+                </div>
+                <div>
+                  <div class="text-white font-medium flex items-center gap-2">
+                    {{ u.name }}
+                    {% if u.id == current_user.id %}
+                    <span class="text-xs text-gray-600">(you)</span>
+                    {% endif %}
+                  </div>
+                  <div class="text-xs text-gray-500">{{ u.email }}</div>
+                </div>
+              </div>
+            </td>
+            <td class="px-6 py-4 text-gray-400 text-xs">
+              {{ u.created_at.strftime('%b %d, %Y') }}<br>
+              <span class="text-gray-600">{{ u.created_at.strftime('%I:%M %p') }}</span>
+            </td>
+            <td class="px-6 py-4">
+              {% if conn %}
+              <div class="text-xs">
+                <div class="text-white font-medium truncate max-w-[180px]" title="{{ conn.ad_account_name }}">{{ conn.ad_account_name }}</div>
+                <div class="text-gray-500 font-mono">{{ conn.ad_account_id }}</div>
+                <div class="mt-1">
+                  {% if conn.last_synced %}
+                  <span class="badge-active px-2 py-0.5 rounded-full text-xs">Synced {{ conn.last_synced.strftime('%b %d') }}</span>
+                  {% else %}
+                  <span class="badge-paused px-2 py-0.5 rounded-full text-xs">Not synced</span>
+                  {% endif %}
+                </div>
+              </div>
+              {% else %}
+              <span class="text-gray-600 text-xs">Not connected</span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4 text-center">
+              {% if row.report_count > 0 %}
+              <span class="text-indigo-400 font-semibold">{{ row.report_count }}</span>
+              {% else %}
+              <span class="text-gray-600">—</span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4 text-center">
+              {% if u.is_admin %}
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30">Admin</span>
+              {% else %}
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-white/5 text-gray-500 border border-white/10">Client</span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4">
+              <div class="flex items-center justify-end gap-2">
+                {% if u.id != current_user.id %}
+
+                <!-- Reset password -->
+                <form method="POST" action="/admin/reset/{{ u.id }}"
+                  onsubmit="return confirm('Generate a new temporary password for {{ u.name }}?')">
+                  <button type="submit"
+                    class="flex items-center gap-1.5 bg-white/5 hover:bg-indigo-500/20 border border-white/10 hover:border-indigo-500/40 text-gray-400 hover:text-indigo-300 text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
+                    title="Reset password">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                    Reset
+                  </button>
+                </form>
+
+                <!-- Toggle admin -->
+                {% if not u.is_admin %}
+                <form method="POST" action="/admin/toggle-admin/{{ u.id }}"
+                  onsubmit="return confirm('Grant admin access to {{ u.name }}?')">
+                  <button type="submit"
+                    class="flex items-center gap-1.5 bg-white/5 hover:bg-purple-500/20 border border-white/10 hover:border-purple-500/40 text-gray-400 hover:text-purple-300 text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
+                    title="Make admin">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    Admin
+                  </button>
+                </form>
+                {% else %}
+                <form method="POST" action="/admin/toggle-admin/{{ u.id }}"
+                  onsubmit="return confirm('Revoke admin access from {{ u.name }}?')">
+                  <button type="submit"
+                    class="flex items-center gap-1.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
+                    title="Revoke admin">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                    Revoke
+                  </button>
+                </form>
+                {% endif %}
+
+                <!-- Delete -->
+                {% if not u.is_admin %}
+                <form method="POST" action="/admin/delete/{{ u.id }}"
+                  onsubmit="return confirm('Permanently delete {{ u.name }} and ALL their data? This cannot be undone.')">
+                  <button type="submit"
+                    class="flex items-center gap-1.5 bg-white/5 hover:bg-red-500/20 border border-white/10 hover:border-red-500/40 text-gray-400 hover:text-red-400 text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
+                    title="Delete user">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    Remove
+                  </button>
+                </form>
+                {% endif %}
+
+                {% else %}
+                <span class="text-xs text-gray-600 italic">your account</span>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function filterUsers() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const rows = document.querySelectorAll('.user-row');
+  let shown = 0;
+  rows.forEach(r => {
+    const match = r.dataset.search.includes(q);
+    r.style.display = match ? '' : 'none';
+    if (match) shown++;
+  });
+  document.getElementById('countLabel').textContent = shown + ' users';
+}
+</script>
+
+{% endblock %}

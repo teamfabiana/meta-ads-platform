@@ -1,0 +1,139 @@
+{% extends "layout.html" %}
+{% block title %}Campaigns{% endblock %}
+{% block content %}
+
+<div class="p-8">
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Campaigns</h1>
+      <p class="text-gray-400 text-sm mt-1">{{ campaigns|length }} campaigns · Last 30 days</p>
+    </div>
+    <div class="flex gap-3 items-center">
+      <!-- Filter -->
+      <select id="statusFilter" onchange="filterTable()" class="bg-white/10 border border-white/20 text-gray-300 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-500">
+        <option value="all">All Statuses</option>
+        <option value="ACTIVE">Active</option>
+        <option value="PAUSED">Paused</option>
+      </select>
+      <form method="POST" action="/sync">
+        <button type="submit" class="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Sync
+        </button>
+      </form>
+    </div>
+  </div>
+
+  {% if not campaigns %}
+  <div class="card rounded-2xl p-12 text-center">
+    <p class="text-gray-400">No campaigns found. Make sure your Meta Ads account is connected and synced.</p>
+    <a href="/connect" class="btn-primary inline-block mt-4 px-6 py-2.5 rounded-xl text-sm font-medium text-white">Connect Account</a>
+  </div>
+  {% else %}
+
+  <!-- Summary bar -->
+  <div class="grid grid-cols-4 gap-4 mb-6">
+    {% for label, val in [('Active', active_count), ('Paused', paused_count), ('Total Spend', '$'~'%.2f'|format(total_spend)), ('Avg ROAS', '%.2f'|format(avg_roas)~'x')] %}
+    <div class="metric-card rounded-xl p-4 text-center">
+      <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ label }}</div>
+      <div class="text-xl font-bold text-white">{{ val }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Table -->
+  <div class="card rounded-2xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-white/10 flex items-center gap-3">
+      <input id="searchInput" oninput="filterTable()" placeholder="Search campaigns…"
+        class="flex-1 bg-white/5 border border-white/15 text-white placeholder-gray-600 text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-indigo-500" />
+      <span class="text-xs text-gray-500" id="countLabel">{{ campaigns|length }} campaigns</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm" id="campaignTable">
+        <thead>
+          <tr class="text-xs text-gray-500 uppercase tracking-wide border-b border-white/10 bg-white/5">
+            <th class="text-left px-6 py-3 cursor-pointer hover:text-gray-300" onclick="sortTable('name')">Campaign ↕</th>
+            <th class="text-left px-6 py-3">Status</th>
+            <th class="text-left px-6 py-3">Objective</th>
+            <th class="text-right px-6 py-3 cursor-pointer hover:text-gray-300" onclick="sortTable('spend')">Spend ↕</th>
+            <th class="text-right px-6 py-3 cursor-pointer hover:text-gray-300" onclick="sortTable('impressions')">Impressions ↕</th>
+            <th class="text-right px-6 py-3 cursor-pointer hover:text-gray-300" onclick="sortTable('clicks')">Clicks ↕</th>
+            <th class="text-right px-6 py-3 cursor-pointer hover:text-gray-300" onclick="sortTable('ctr')">CTR ↕</th>
+            <th class="text-right px-6 py-3 cursor-pointer hover:text-gray-300" onclick="sortTable('cpc')">CPC ↕</th>
+            <th class="text-right px-6 py-3 cursor-pointer hover:text-gray-300" onclick="sortTable('cpm')">CPM ↕</th>
+            <th class="text-right px-6 py-3 cursor-pointer hover:text-gray-300" onclick="sortTable('roas')">ROAS ↕</th>
+            <th class="text-right px-6 py-3">Conv.</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5" id="tableBody">
+          {% for c in campaigns %}
+          <tr class="table-row campaign-row" data-status="{{ c.status }}" data-name="{{ c.campaign_name|lower }}">
+            <td class="px-6 py-3.5 text-white font-medium max-w-[220px]">
+              <div class="truncate" title="{{ c.campaign_name }}">{{ c.campaign_name }}</div>
+            </td>
+            <td class="px-6 py-3.5">
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                {% if c.status == 'ACTIVE' %}badge-active
+                {% elif c.status == 'PAUSED' %}badge-paused
+                {% else %}badge-poor{% endif %}">
+                {{ c.status }}
+              </span>
+            </td>
+            <td class="px-6 py-3.5 text-gray-400 text-xs">{{ c.objective or '—' }}</td>
+            <td class="px-6 py-3.5 text-right text-gray-200">${{ '%.2f'|format(c.spend) }}</td>
+            <td class="px-6 py-3.5 text-right text-gray-400">{{ '{:,}'.format(c.impressions) }}</td>
+            <td class="px-6 py-3.5 text-right text-gray-400">{{ '{:,}'.format(c.clicks) }}</td>
+            <td class="px-6 py-3.5 text-right font-medium {% if c.ctr >= 1.5 %}text-green-400{% elif c.ctr >= 0.5 %}text-yellow-400{% else %}text-red-400{% endif %}">
+              {{ '%.2f'|format(c.ctr) }}%
+            </td>
+            <td class="px-6 py-3.5 text-right text-gray-300">${{ '%.2f'|format(c.cpc) }}</td>
+            <td class="px-6 py-3.5 text-right text-gray-300">${{ '%.2f'|format(c.cpm) }}</td>
+            <td class="px-6 py-3.5 text-right font-medium {% if c.roas >= 3 %}text-green-400{% elif c.roas >= 1 %}text-yellow-400{% elif c.roas > 0 %}text-red-400{% else %}text-gray-600{% endif %}">
+              {% if c.roas > 0 %}{{ '%.2f'|format(c.roas) }}x{% else %}—{% endif %}
+            </td>
+            <td class="px-6 py-3.5 text-right text-gray-400">{{ c.conversions or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+let sortCol = 'spend', sortAsc = false;
+
+function filterTable() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const status = document.getElementById('statusFilter').value;
+  const rows = document.querySelectorAll('.campaign-row');
+  let shown = 0;
+  rows.forEach(r => {
+    const nameMatch = r.dataset.name.includes(search);
+    const statusMatch = status === 'all' || r.dataset.status === status;
+    r.style.display = (nameMatch && statusMatch) ? '' : 'none';
+    if (nameMatch && statusMatch) shown++;
+  });
+  document.getElementById('countLabel').textContent = shown + ' campaigns';
+}
+
+function sortTable(col) {
+  if (sortCol === col) sortAsc = !sortAsc; else { sortCol = col; sortAsc = false; }
+  const colMap = { name:0, spend:3, impressions:4, clicks:5, ctr:6, cpc:7, cpm:8, roas:9 };
+  const tbody = document.getElementById('tableBody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a,b) => {
+    const ai = colMap[col], ai2 = ai;
+    const av = a.cells[ai].innerText.replace(/[$,%x,]/g,'').trim();
+    const bv = b.cells[ai].innerText.replace(/[$,%x,]/g,'').trim();
+    const an = parseFloat(av) || av, bn = parseFloat(bv) || bv;
+    if (an < bn) return sortAsc ? -1 : 1;
+    if (an > bn) return sortAsc ? 1 : -1;
+    return 0;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+
+{% endblock %}

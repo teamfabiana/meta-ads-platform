@@ -1,0 +1,209 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+
+<div class="p-8">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-bold text-white">Dashboard</h1>
+      <p class="text-gray-400 text-sm mt-1">
+        {% if connection %}
+          {{ connection.ad_account_name }} &nbsp;·&nbsp;
+          Last synced: {{ connection.last_synced.strftime('%b %d, %I:%M %p') if connection.last_synced else 'Never' }}
+        {% else %}
+          No account connected yet
+        {% endif %}
+      </p>
+    </div>
+    <div class="flex gap-3">
+      {% if connection %}
+        <form method="POST" action="/sync">
+          <button type="submit" class="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Sync Data
+          </button>
+        </form>
+        <a href="/analysis" class="btn-primary flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          AI Analysis
+        </a>
+      {% else %}
+        <a href="/connect" class="btn-meta flex items-center gap-2 text-white text-sm font-medium px-4 py-2.5 rounded-xl">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          Connect Meta Ads
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if not connection %}
+  <!-- Empty state -->
+  <div class="card rounded-2xl p-12 text-center max-w-lg mx-auto mt-16">
+    <div class="w-16 h-16 rounded-full bg-indigo-500/20 flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+    </div>
+    <h3 class="text-lg font-semibold text-white mb-2">Connect your Meta Ads account</h3>
+    <p class="text-gray-400 text-sm mb-6">Link your Facebook/Instagram Ads account to start seeing AI-powered insights and recommendations.</p>
+    <a href="/connect" class="btn-meta inline-flex items-center gap-2 text-white font-medium px-6 py-3 rounded-xl">
+      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+      Connect with Facebook
+    </a>
+  </div>
+
+  {% else %}
+
+  <!-- Metric cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    {% set metrics = [
+      ('Total Spend', '$' ~ '{:,.2f}'.format(stats.total_spend), 'text-green-400', 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'),
+      ('Impressions', '{:,}'.format(stats.total_impressions), 'text-blue-400', 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z'),
+      ('Clicks', '{:,}'.format(stats.total_clicks), 'text-purple-400', 'M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122'),
+      ('Avg CTR', '{:.2f}%'.format(stats.avg_ctr), 'text-yellow-400', 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6'),
+    ] %}
+    {% for label, value, color, icon in metrics %}
+    <div class="metric-card rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">{{ label }}</span>
+        <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+          <svg class="w-4 h-4 {{ color }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ icon }}"/>
+          </svg>
+        </div>
+      </div>
+      <div class="text-2xl font-bold {{ color }}">{{ value }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Second row metrics -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    {% set metrics2 = [
+      ('CPC', '$' ~ '{:.2f}'.format(stats.avg_cpc), 'text-orange-400'),
+      ('CPM', '$' ~ '{:.2f}'.format(stats.avg_cpm), 'text-pink-400'),
+      ('ROAS', '{:.2f}x'.format(stats.avg_roas), 'text-cyan-400'),
+      ('Conversions', '{:,}'.format(stats.total_conversions), 'text-emerald-400'),
+    ] %}
+    {% for label, value, color in metrics2 %}
+    <div class="metric-card rounded-2xl p-5">
+      <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">{{ label }}</div>
+      <div class="text-2xl font-bold {{ color }}">{{ value }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Charts row -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- Spend by campaign -->
+    <div class="card rounded-2xl p-6">
+      <h3 class="text-sm font-semibold text-gray-300 mb-4">Spend by Campaign (Top 8)</h3>
+      <canvas id="spendChart" height="220"></canvas>
+    </div>
+    <!-- Campaign status -->
+    <div class="card rounded-2xl p-6">
+      <h3 class="text-sm font-semibold text-gray-300 mb-4">Campaign Overview</h3>
+      <canvas id="statusChart" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- CTR vs Spend scatter  -->
+  <div class="card rounded-2xl p-6 mb-8">
+    <h3 class="text-sm font-semibold text-gray-300 mb-4">CTR vs Spend — Campaign Performance Map</h3>
+    <canvas id="scatterChart" height="120"></canvas>
+  </div>
+
+  <!-- Recent campaigns table -->
+  <div class="card rounded-2xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-semibold text-gray-300">Top Campaigns by Spend</h3>
+      <a href="/campaigns" class="text-indigo-400 hover:text-indigo-300 text-xs font-medium">View all →</a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-xs text-gray-500 uppercase tracking-wide border-b border-white/10">
+            <th class="text-left pb-3">Campaign</th>
+            <th class="text-left pb-3">Status</th>
+            <th class="text-right pb-3">Spend</th>
+            <th class="text-right pb-3">CTR</th>
+            <th class="text-right pb-3">CPC</th>
+            <th class="text-right pb-3">ROAS</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5">
+          {% for c in top_campaigns %}
+          <tr class="table-row">
+            <td class="py-3 text-white font-medium max-w-[200px] truncate">{{ c.campaign_name }}</td>
+            <td class="py-3">
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                {% if c.status == 'ACTIVE' %}badge-active
+                {% elif c.status == 'PAUSED' %}badge-paused
+                {% else %}badge-poor{% endif %}">
+                {{ c.status }}
+              </span>
+            </td>
+            <td class="py-3 text-right text-gray-300">${{ '%.2f'|format(c.spend) }}</td>
+            <td class="py-3 text-right {% if c.ctr >= 1 %}text-green-400{% elif c.ctr >= 0.5 %}text-yellow-400{% else %}text-red-400{% endif %}">{{ '%.2f'|format(c.ctr) }}%</td>
+            <td class="py-3 text-right text-gray-300">${{ '%.2f'|format(c.cpc) }}</td>
+            <td class="py-3 text-right {% if c.roas >= 2 %}text-green-400{% elif c.roas >= 1 %}text-yellow-400{% else %}text-red-400{% endif %}">{{ '%.2f'|format(c.roas) }}x</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% if connection and campaigns_json %}
+<script>
+const campaignsData = {{ campaigns_json | safe }};
+
+// Spend chart
+const top8 = [...campaignsData].sort((a,b) => b.spend - a.spend).slice(0,8);
+new Chart(document.getElementById('spendChart'), {
+  type: 'bar',
+  data: {
+    labels: top8.map(c => c.name.length > 20 ? c.name.slice(0,20)+'…' : c.name),
+    datasets: [{ data: top8.map(c => c.spend), backgroundColor: 'rgba(99,102,241,0.7)', borderColor: 'rgba(99,102,241,1)', borderWidth: 1, borderRadius: 6 }]
+  },
+  options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color:'#9ca3af', font:{size:10} }, grid:{color:'rgba(255,255,255,0.05)'} }, y: { ticks: { color:'#9ca3af', callback: v => '$'+v.toLocaleString() }, grid:{color:'rgba(255,255,255,0.05)'} } } }
+});
+
+// Status donut
+const active = campaignsData.filter(c=>c.status==='ACTIVE').length;
+const paused = campaignsData.filter(c=>c.status==='PAUSED').length;
+const other  = campaignsData.length - active - paused;
+new Chart(document.getElementById('statusChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Active','Paused','Other'],
+    datasets: [{ data: [active, paused, other], backgroundColor: ['rgba(34,197,94,0.7)','rgba(234,179,8,0.7)','rgba(107,114,128,0.7)'], borderWidth: 0 }]
+  },
+  options: { responsive: true, cutout:'65%', plugins: { legend: { position:'bottom', labels:{color:'#9ca3af',padding:16,font:{size:12}} } } }
+});
+
+// Scatter
+new Chart(document.getElementById('scatterChart'), {
+  type: 'scatter',
+  data: {
+    datasets: [{
+      label: 'Campaigns',
+      data: campaignsData.map(c => ({x: c.spend, y: c.ctr, label: c.name})),
+      backgroundColor: 'rgba(99,102,241,0.6)', pointRadius: 6, pointHoverRadius: 9
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: ctx => `${ctx.raw.label}: $${ctx.raw.x.toFixed(2)} spend, ${ctx.raw.y.toFixed(2)}% CTR` } } },
+    scales: {
+      x: { title:{display:true,text:'Spend ($)',color:'#9ca3af'}, ticks:{color:'#9ca3af'}, grid:{color:'rgba(255,255,255,0.05)'} },
+      y: { title:{display:true,text:'CTR (%)',color:'#9ca3af'}, ticks:{color:'#9ca3af'}, grid:{color:'rgba(255,255,255,0.05)'} }
+    }
+  }
+});
+</script>
+{% endif %}
+
+{% endblock %}

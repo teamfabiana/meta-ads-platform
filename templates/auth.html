@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'login' %}Sign In{% else %}Create Account{% endif %}{% endblock %}
+{% block body %}
+
+<div class="min-h-screen flex items-center justify-center px-4">
+  <div class="w-full max-w-md">
+
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl btn-primary mb-4">
+        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+      </div>
+      <h1 class="text-3xl font-bold text-white">MetaInsights</h1>
+      <p class="text-gray-400 mt-1">AI-Powered Meta Ads Analytics</p>
+    </div>
+
+    <!-- Card -->
+    <div class="card rounded-2xl p-8">
+      <h2 class="text-xl font-semibold mb-6 text-center">
+        {% if mode == 'login' %}Welcome back{% else %}Create your account{% endif %}
+      </h2>
+
+      <form method="POST">
+        {% if mode == 'register' %}
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-300 mb-2">Full Name</label>
+          <input type="text" name="name" required
+            class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            placeholder="Your name" />
+        </div>
+        {% endif %}
+
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
+          <input type="email" name="email" required
+            class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            placeholder="you@company.com" />
+        </div>
+
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-300 mb-2">Password</label>
+          <input type="password" name="password" required
+            class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            placeholder="••••••••" />
+        </div>
+
+        <button type="submit" class="w-full btn-primary text-white font-semibold py-3 rounded-xl">
+          {% if mode == 'login' %}Sign In{% else %}Create Account{% endif %}
+        </button>
+      </form>
+
+      <p class="text-center text-gray-400 text-sm mt-6">
+        {% if mode == 'login' %}
+          Don't have an account?
+          <a href="/register" class="text-indigo-400 hover:text-indigo-300 font-medium">Sign up free</a>
+        {% else %}
+          Already have an account?
+          <a href="/login" class="text-indigo-400 hover:text-indigo-300 font-medium">Sign in</a>
+        {% endif %}
+      </p>
+    </div>
+
+    <p class="text-center text-gray-600 text-xs mt-6">
+      Secure • Multi-tenant • Your data stays private
+    </p>
+  </div>
+</div>
+
+{% endblock %}
