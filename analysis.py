@@ -90,14 +90,42 @@ def generate_analysis(
     summary_data = build_campaign_summary(campaigns)
     client = anthropic.Anthropic(api_key=api_key)
 
-    prompt = f"""You are an expert Meta Ads (Facebook/Instagram Ads) analyst. Analyze the following campaign performance data for {date_range} and provide actionable insights.
+    benchmarks = """
+INDUSTRY BENCHMARKS (2024) — use these to evaluate performance:
+
+CTR (Click-Through Rate):
+  - Cold traffic: 1.5–2.5%+ is good | Below 1% = creative is struggling
+  - Warm traffic: 3–5%+ is good
+
+CPC (Cost Per Click):
+  - E-commerce: $0.80–$1.50 is normal
+  - Info products / coaching: $1.00–$3.00 is normal
+  - Below $0.50 = excellent | Above $3.00 = needs attention
+
+CPM (Cost Per 1,000 Impressions):
+  - Under $10 = great | $10–$25 = normal | Over $30 = audience fatigue or saturation
+
+Landing Page CVR:
+  - Cold traffic: 2–5% | Warm traffic: 5–10%+ | Optimized funnels: 10–20%+
+
+ROAS (Return on Ad Spend):
+  - Break-even: 2–3x (depends on margins)
+  - Healthy: 3–5x | Scaling profitably: 4x+ blended
+
+Hook Rate (3-sec video view rate):
+  - Scroll-stopping: 40–50%+ | Decent: 30–40% | Needs work: Below 30%
+"""
+
+    prompt = f"""You are an expert Meta Ads (Facebook/Instagram Ads) strategist and analyst. Analyze the following campaign performance data for {date_range} and provide actionable insights.
 
 Ad Account: {connection.ad_account_name}
 
-PERFORMANCE SUMMARY:
+{benchmarks}
+
+ACCOUNT PERFORMANCE SUMMARY:
 {json.dumps(summary_data, indent=2)}
 
-INDIVIDUAL CAMPAIGN DETAILS (top 20):
+INDIVIDUAL CAMPAIGN DETAILS (top 20 by spend):
 {json.dumps([
     {
         "name": c.campaign_name,
@@ -115,24 +143,24 @@ INDIVIDUAL CAMPAIGN DETAILS (top 20):
     for c in sorted(campaigns, key=lambda x: x.spend, reverse=True)[:20]
 ], indent=2)}
 
-Please provide:
-1. EXECUTIVE SUMMARY (2-3 paragraphs): Overall account health, key wins, key concerns
-2. PERFORMANCE SCORE (0-100): Rate the overall account performance with brief justification
-3. TOP 5 RECOMMENDATIONS: Specific, actionable steps to improve performance. Each recommendation should include:
-   - The issue or opportunity
-   - Specific action to take
+Using the benchmarks above as your evaluation standard, please provide:
+1. EXECUTIVE SUMMARY (2-3 paragraphs): Overall account health, key wins, key concerns — reference specific benchmark comparisons (e.g. "Your CTR of 0.8% is below the 1.5% cold traffic benchmark")
+2. PERFORMANCE SCORE (0-100): Rate overall performance against the benchmarks with justification
+3. TOP 5 RECOMMENDATIONS: Specific, prioritized actions. Each must include:
+   - The issue (with benchmark comparison)
+   - Exact action to take
    - Expected impact
-4. BUDGET OPTIMIZATION: How to reallocate budget for better results
-5. QUICK WINS: 2-3 things they can do immediately (today) to improve results
+4. BUDGET OPTIMIZATION: Which campaigns to scale, pause, or reallocate budget from/to
+5. QUICK WINS: 2-3 things they can do TODAY to improve results
 
 Format your response as JSON with these keys:
 - summary (string, HTML formatted with <p>, <strong>, <ul>, <li> tags)
 - score (integer 0-100)
 - score_label (string: "Poor", "Fair", "Good", "Excellent")
-- recommendations (array of objects with: title, issue, action, impact, priority)
+- recommendations (array of objects with: title, issue, action, impact, priority ["high"/"medium"/"low"])
 - budget_optimization (string, HTML formatted)
 - quick_wins (array of strings)
-- key_metrics_assessment (object with: spend_efficiency, audience_targeting, creative_performance, conversion_optimization — each rated "low/medium/high" with a note)"""
+- key_metrics_assessment (object with keys: ctr_performance, cpc_efficiency, cpm_health, roas_strength — each an object with: rating ["low"/"medium"/"high"], benchmark (string), actual (string), note (string))"""
 
     message = client.messages.create(
         model="claude-sonnet-4-6",

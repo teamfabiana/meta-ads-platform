@@ -75,22 +75,26 @@
 
     <!-- Key metrics assessment -->
     <div class="card rounded-2xl p-6 lg:col-span-2">
-      <h3 class="text-sm font-semibold text-gray-300 mb-4">Performance Assessment</h3>
+      <h3 class="text-sm font-semibold text-gray-300 mb-4">Metrics vs. 2024 Benchmarks</h3>
       {% if report.key_metrics_assessment %}
       <div class="space-y-3">
+        {% set label_map = {'ctr_performance': 'CTR', 'cpc_efficiency': 'CPC', 'cpm_health': 'CPM', 'roas_strength': 'ROAS'} %}
         {% for key, val in report.key_metrics_assessment.items() %}
-        <div class="flex items-start gap-3">
-          <div class="flex-shrink-0 w-2 h-2 rounded-full mt-2
-            {% if val.rating == 'high' %}bg-green-400{% elif val.rating == 'medium' %}bg-yellow-400{% else %}bg-red-400{% endif %}">
+        <div class="bg-white/5 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-semibold text-white">{{ label_map.get(key, key.replace('_',' ').title()) }}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium
+                {% if val.rating == 'high' %}bg-green-500/20 text-green-400{% elif val.rating == 'medium' %}bg-yellow-500/20 text-yellow-400{% else %}bg-red-500/20 text-red-400{% endif %}">
+                {{ val.rating|capitalize }}
+              </span>
+            </div>
+            <div class="flex items-center gap-3 text-xs">
+              {% if val.actual %}<span class="text-white font-mono">Yours: {{ val.actual }}</span>{% endif %}
+              {% if val.benchmark %}<span class="text-gray-500">Benchmark: {{ val.benchmark }}</span>{% endif %}
+            </div>
           </div>
-          <div>
-            <span class="text-sm font-medium text-white capitalize">{{ key.replace('_',' ') }}</span>
-            <span class="ml-2 text-xs px-1.5 py-0.5 rounded font-medium
-              {% if val.rating == 'high' %}bg-green-500/20 text-green-400{% elif val.rating == 'medium' %}bg-yellow-500/20 text-yellow-400{% else %}bg-red-500/20 text-red-400{% endif %}">
-              {{ val.rating|capitalize }}
-            </span>
-            <p class="text-xs text-gray-500 mt-0.5">{{ val.note }}</p>
-          </div>
+          {% if val.note %}<p class="text-xs text-gray-500">{{ val.note }}</p>{% endif %}
         </div>
         {% endfor %}
       </div>
