@@ -624,25 +624,29 @@ def setup_admin(secret):
     users = User.query.order_by(User.created_at).all()
     if not users:
         return "No users registered yet.", 200
-    results = []
-    for u in users:
-        results.append(f"{u.email} — admin={u.is_admin}")
-    return "<br>".join(["<b>Users:</b>"] + results + [
-        "<br><b>To promote a user, visit:</b><br>",
-        f"/setup-admin/{secret}/promote/EMAIL"
-    ])
+    rows = "".join(
+        f"<tr><td style='padding:8px;border:1px solid #ccc'>{u.name}</td>"
+        f"<td style='padding:8px;border:1px solid #ccc'>{u.email}</td>"
+        f"<td style='padding:8px;border:1px solid #ccc'>{'✅ Admin' if u.is_admin else '—'}</td>"
+        f"<td style='padding:8px;border:1px solid #ccc'>"
+        f"<a href='/setup-admin/{secret}/promote?uid={u.id}' style='color:blue'>Make Admin</a>"
+        f"</td></tr>"
+        for u in users
+    )
+    return f"<h2>Users</h2><table style='border-collapse:collapse'><tr><th>Name</th><th>Email</th><th>Admin</th><th>Action</th></tr>{rows}</table>"
 
-@app.route("/setup-admin/<secret>/promote/<email>")
-def setup_admin_promote(secret, email):
+@app.route("/setup-admin/<secret>/promote")
+def setup_admin_promote(secret):
     expected = os.environ.get("ADMIN_SETUP_SECRET", "")
     if not expected or secret != expected:
         return "Not found", 404
-    user = User.query.filter_by(email=email.lower()).first()
+    uid = request.args.get("uid", "")
+    user = User.query.get(int(uid)) if uid.isdigit() else None
     if not user:
-        return f"No user found with email: {email}", 404
+        return "User not found.", 404
     user.is_admin = True
     db.session.commit()
-    return f"✓ {user.name} ({email}) is now an admin. You can remove ADMIN_SETUP_SECRET from Railway variables now."
+    return f"<h2>✅ Done!</h2><p>{user.name} ({user.email}) is now an admin.</p><p>You can now delete the ADMIN_SETUP_SECRET variable in Railway and visit <a href='/admin'>/admin</a>.</p>"
 
 
 if __name__ == "__main__":
