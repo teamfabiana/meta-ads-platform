@@ -614,6 +614,37 @@ def make_admin_cmd():
         print(f"✓ {user.name} ({email}) is now an admin.")
 
 
+# ── One-time admin setup (visit URL to promote, auto-disables after use) ──────
+
+@app.route("/setup-admin/<secret>")
+def setup_admin(secret):
+    expected = os.environ.get("ADMIN_SETUP_SECRET", "")
+    if not expected or secret != expected:
+        return "Not found", 404
+    users = User.query.order_by(User.created_at).all()
+    if not users:
+        return "No users registered yet.", 200
+    results = []
+    for u in users:
+        results.append(f"{u.email} — admin={u.is_admin}")
+    return "<br>".join(["<b>Users:</b>"] + results + [
+        "<br><b>To promote a user, visit:</b><br>",
+        f"/setup-admin/{secret}/promote/EMAIL"
+    ])
+
+@app.route("/setup-admin/<secret>/promote/<email>")
+def setup_admin_promote(secret, email):
+    expected = os.environ.get("ADMIN_SETUP_SECRET", "")
+    if not expected or secret != expected:
+        return "Not found", 404
+    user = User.query.filter_by(email=email.lower()).first()
+    if not user:
+        return f"No user found with email: {email}", 404
+    user.is_admin = True
+    db.session.commit()
+    return f"✓ {user.name} ({email}) is now an admin. You can remove ADMIN_SETUP_SECRET from Railway variables now."
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
