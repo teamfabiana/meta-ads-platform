@@ -76,6 +76,16 @@ class PasswordResetToken(db.Model):
         return datetime.utcnow() > self.created_at + timedelta(hours=24)
 
 
+class ChatMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    connection_id = db.Column(db.Integer, db.ForeignKey("meta_connection.id"), nullable=True)
+    role = db.Column(db.String(10), nullable=False)  # 'user' or 'assistant'
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship("User", backref="chat_messages")
+
+
 class AnalysisReport(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)

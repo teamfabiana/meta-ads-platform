@@ -8,12 +8,12 @@ from flask import Flask, render_template, redirect, url_for, request, flash, ses
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
 
-from models import db, User, MetaConnection, CampaignCache, AnalysisReport, PasswordResetToken
+from models import db, User, MetaConnection, CampaignCache, AnalysisReport, PasswordResetToken, ChatMessage
 from meta_api import (
     get_oauth_url, exchange_code_for_token, get_long_lived_token,
     get_fb_user, get_ad_accounts, sync_campaigns,
 )
-from analysis import generate_analysis, build_campaign_summary
+from analysis import generate_analysis, build_campaign_summary, chat_with_advisor
 
 load_dotenv()
 
@@ -143,12 +143,19 @@ def logout():
 @login_required
 def dashboard():
     connection = MetaConnection.query.filter_by(user_id=current_user.id).first()
+    period = request.args.get("period", "last_30d")
     campaigns = []
     stats = _empty_stats()
     top_campaigns = []
     campaigns_json = None
 
     if connection:
+        # Re-sync if period changed
+        if request.args.get("period") and connection:
+            try:
+                sync_campaigns(connection, date_preset=period)
+            except Exception:
+                pass
         campaigns = CampaignCache.query.filter_by(connection_id=connection.id).all()
         if campaigns:
             s = build_campaign_summary(campaigns)
@@ -167,6 +174,7 @@ def dashboard():
         stats=stats,
         top_campaigns=top_campaigns,
         campaigns_json=campaigns_json,
+        period=period,
     )
 
 
@@ -179,6 +187,13 @@ def campaigns():
     if not connection:
         flash("Connect your Meta Ads account first.", "info")
         return redirect(url_for("connect"))
+
+    period = request.args.get("period", "last_30d")
+    if request.args.get("period"):
+        try:
+            sync_campaigns(connection, date_preset=period)
+        except Exception:
+            pass
 
     camps = CampaignCache.query.filter_by(connection_id=connection.id)\
         .order_by(CampaignCache.spend.desc()).all()
@@ -198,6 +213,7 @@ def campaigns():
         paused_count=paused_count,
         total_spend=total_spend,
         avg_roas=avg_roas,
+        period=period,
     )
 
 
@@ -207,79 +223,74 @@ def campaigns():
 @login_required
 def analysis():
     connection = MetaConnection.query.filter_by(user_id=current_user.id).first()
-    report_obj = None
-    report = None
+    messages = []
+    campaigns_summary = None
 
     if connection:
-        report_obj = AnalysisReport.query.filter_by(
-            user_id=current_user.id, connection_id=connection.id
-        ).order_by(AnalysisReport.created_at.desc()).first()
-
-        if report_obj:
-            report = _parse_report(report_obj)
+        messages = (
+            ChatMessage.query
+            .filter_by(user_id=current_user.id, connection_id=connection.id)
+            .order_by(ChatMessage.created_at)
+            .all()
+        )
+        camps = CampaignCache.query.filter_by(connection_id=connection.id).all()
+        if camps:
+            s = build_campaign_summary(camps)
+            campaigns_summary = _flatten_stats(s)
+            campaigns_summary.active_count = s["counts"]["active"]
 
     return render_template(
         "analysis.html",
         active_page="analysis",
         connection=connection,
-        report=report,
-        enumerate=enumerate,
+        messages=messages,
+        campaigns_summary=campaigns_summary,
     )
 
 
-@app.route("/analysis/generate", methods=["POST"])
+@app.route("/analysis/chat", methods=["POST"])
 @login_required
-def generate_analysis_route():
+def analysis_chat():
     try:
-        if not ANTHROPIC_API_KEY:
-            flash("Anthropic API key not configured.", "error")
-            return redirect(url_for("analysis"))
+        data = request.get_json()
+        user_message = (data.get("message") or "").strip()
+        if not user_message:
+            return jsonify({"error": "Empty message"}), 400
 
         connection = MetaConnection.query.filter_by(user_id=current_user.id).first()
         if not connection:
-            flash("Connect your Meta Ads account first.", "info")
-            return redirect(url_for("connect"))
+            return jsonify({"error": "No Meta Ads account connected"}), 400
 
         campaigns = CampaignCache.query.filter_by(connection_id=connection.id).all()
         if not campaigns:
-            flash("No campaign data found. Sync your account first.", "info")
-            return redirect(url_for("connect"))
+            return jsonify({"error": "No campaign data. Please sync your account first."}), 400
 
-        result = generate_analysis(campaigns, connection, ANTHROPIC_API_KEY)
+        history = [
+            {"role": m.role, "content": m.content}
+            for m in ChatMessage.query
+            .filter_by(user_id=current_user.id, connection_id=connection.id)
+            .order_by(ChatMessage.created_at)
+            .all()[-10:]
+        ]
 
-        # Replace previous report
-        old = AnalysisReport.query.filter_by(
-            user_id=current_user.id, connection_id=connection.id
-        ).first()
-        if old:
-            db.session.delete(old)
-            db.session.flush()
+        reply = chat_with_advisor(user_message, history, campaigns, connection, ANTHROPIC_API_KEY)
 
-        report = AnalysisReport(
-            user_id=current_user.id,
-            connection_id=connection.id,
-            summary=result.get("summary", ""),
-            recommendations=json.dumps({
-                "recommendations": result.get("recommendations", []),
-                "quick_wins": result.get("quick_wins", []),
-                "budget_optimization": result.get("budget_optimization", ""),
-                "key_metrics_assessment": result.get("key_metrics_assessment", {}),
-                "score_label": result.get("score_label", "Fair"),
-            }),
-            score=result.get("score", 0),
-            date_range="Last 30 days",
-        )
-        db.session.add(report)
+        db.session.add(ChatMessage(
+            user_id=current_user.id, connection_id=connection.id,
+            role="user", content=user_message,
+        ))
+        db.session.add(ChatMessage(
+            user_id=current_user.id, connection_id=connection.id,
+            role="assistant", content=reply,
+        ))
         db.session.commit()
-        flash("Analysis generated successfully!", "success")
+        return jsonify({"reply": reply})
 
     except Exception as e:
         import traceback
         db.session.rollback()
-        app.logger.error(f"Analysis generation error:\n{traceback.format_exc()}")
-        flash(f"Analysis failed: {str(e)}", "error")
-
-    return redirect(url_for("analysis"))
+        app.logger.error(f"Chat error:\n{traceback.format_exc()}")
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Connect / OAuth ───────────────────────────────────────────────────────────
@@ -433,18 +444,21 @@ def _empty_stats():
     })()
 
 
+class _Stats:
+    pass
+
 def _flatten_stats(s):
-    return type("Stats", (), {
-        "total_spend": s["totals"]["spend"],
-        "total_impressions": s["totals"]["impressions"],
-        "total_clicks": s["totals"]["clicks"],
-        "total_conversions": s["totals"]["conversions"],
-        "total_reach": s["totals"]["reach"],
-        "avg_ctr": s["averages"]["ctr"],
-        "avg_cpc": s["averages"]["cpc"],
-        "avg_cpm": s["averages"]["cpm"],
-        "avg_roas": s["averages"]["roas"],
-    })()
+    obj = _Stats()
+    obj.total_spend = s["totals"]["spend"]
+    obj.total_impressions = s["totals"]["impressions"]
+    obj.total_clicks = s["totals"]["clicks"]
+    obj.total_conversions = s["totals"]["conversions"]
+    obj.total_reach = s["totals"]["reach"]
+    obj.avg_ctr = s["averages"]["ctr"]
+    obj.avg_cpc = s["averages"]["cpc"]
+    obj.avg_cpm = s["averages"]["cpm"]
+    obj.avg_roas = s["averages"]["roas"]
+    return obj
 
 
 def _parse_report(report_obj):

@@ -189,3 +189,58 @@ Format your response as JSON with these keys:
 
     result["summary_data"] = summary_data
     return result
+
+
+BENCHMARKS_SHORT = """
+2024 Meta Ads Benchmarks:
+- CTR: cold 1.5-2.5%+ | warm 3-5%+ | below 1% = struggling
+- CPC: ecom $0.80-$1.50 | coaching $1-$3
+- CPM: <$10 great | $10-$25 normal | >$30 = fatigue
+- ROAS: 2-3x break-even | 3-5x healthy | 4x+ scalable
+- Hook rate: 40-50%+ scroll-stopping | <30% needs work
+"""
+
+
+def chat_with_advisor(
+    user_message: str,
+    history: list[dict],
+    campaigns: list[CampaignCache],
+    connection: MetaConnection,
+    api_key: str,
+) -> str:
+    summary = build_campaign_summary(campaigns)
+    client = anthropic.Anthropic(api_key=api_key)
+
+    system = f"""You are Marketing Maestro, an expert Meta Ads strategist and AI advisor.
+You are analyzing the ad account: {connection.ad_account_name}
+
+{BENCHMARKS_SHORT}
+
+CURRENT ACCOUNT DATA (last 30 days):
+- Total Spend: ${summary['totals']['spend']:,.2f}
+- Impressions: {summary['totals']['impressions']:,}
+- Clicks: {summary['totals']['clicks']:,}
+- Avg CTR: {summary['averages']['ctr']}%
+- Avg CPC: ${summary['averages']['cpc']}
+- Avg CPM: ${summary['averages']['cpm']}
+- Avg ROAS: {summary['averages']['roas']}x
+- Active campaigns: {summary['counts']['active']} | Paused: {summary['counts']['paused']}
+
+TOP CAMPAIGNS BY SPEND:
+{json.dumps(summary['top_spenders'], indent=2)}
+
+UNDERPERFORMING CAMPAIGNS:
+{json.dumps(summary['underperformers'], indent=2)}
+
+Always be specific, reference actual numbers from the data, compare against benchmarks, and give actionable advice.
+Keep responses concise and formatted with bullet points when listing items. Use plain text, no markdown headers."""
+
+    messages = history[-10:] + [{"role": "user", "content": user_message}]
+
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        system=system,
+        messages=messages,
+    )
+    return response.content[0].text

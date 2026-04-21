@@ -1,184 +1,211 @@
 {% extends "layout.html" %}
-{% block title %}AI Analysis{% endblock %}
+{% block title %}AI Advisor{% endblock %}
 {% block content %}
 
-<div class="p-8">
-  <div class="flex items-center justify-between mb-8">
+<div class="flex flex-col h-full">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between px-8 py-5 border-b border-white/10 flex-shrink-0">
     <div>
-      <h1 class="text-2xl font-bold text-white">AI Analysis</h1>
-      <p class="text-gray-400 text-sm mt-1">Claude-powered insights and recommendations for your Meta Ads</p>
+      <h1 class="text-2xl font-bold text-white">AI Advisor</h1>
+      <p class="text-gray-400 text-sm mt-0.5">
+        Powered by Marketing Maestro
+        {% if connection %} · {{ connection.ad_account_name }}{% endif %}
+      </p>
     </div>
-    {% if connection %}
-    <form method="POST" action="/analysis/generate">
-      <button type="submit" class="btn-primary flex items-center gap-2 text-white text-sm font-medium px-5 py-2.5 rounded-xl">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-        Generate New Analysis
-      </button>
-    </form>
+    {% if connection and campaigns_summary %}
+    <div class="flex gap-4 text-center">
+      {% for label, val, color in [
+        ('Spend', '$'~'%.0f'|format(campaigns_summary.total_spend), 'text-green-400'),
+        ('ROAS', '%.2f'|format(campaigns_summary.avg_roas)~'x', 'text-cyan-400'),
+        ('CTR', '%.2f'|format(campaigns_summary.avg_ctr)~'%', 'text-purple-400'),
+        ('Active', campaigns_summary.active_count|string, 'text-blue-400'),
+      ] %}
+      <div class="metric-card rounded-xl px-4 py-2 text-center">
+        <div class="text-xs text-gray-500">{{ label }}</div>
+        <div class="text-sm font-bold {{ color }}">{{ val }}</div>
+      </div>
+      {% endfor %}
+    </div>
     {% endif %}
   </div>
 
   {% if not connection %}
-  <div class="card rounded-2xl p-12 text-center max-w-lg mx-auto mt-16">
-    <div class="w-16 h-16 rounded-full bg-indigo-500/20 flex items-center justify-center mx-auto mb-4">
-      <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+  <div class="flex-1 flex items-center justify-center">
+    <div class="card rounded-2xl p-12 text-center max-w-md">
+      <div class="w-16 h-16 rounded-full bg-indigo-500/20 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      </div>
+      <h3 class="text-lg font-semibold mb-2">Connect your Meta Ads account first</h3>
+      <p class="text-gray-400 text-sm mb-5">Link your account to start chatting with your AI advisor.</p>
+      <a href="/connect" class="btn-meta inline-flex items-center gap-2 text-white font-medium px-6 py-3 rounded-xl text-sm">Connect Account</a>
     </div>
-    <h3 class="text-lg font-semibold mb-2">Connect your Meta Ads account first</h3>
-    <p class="text-gray-400 text-sm mb-6">You need to connect and sync your Meta Ads account before generating AI analysis.</p>
-    <a href="/connect" class="btn-meta inline-flex items-center gap-2 text-white font-medium px-6 py-3 rounded-xl">Connect Account</a>
-  </div>
-
-  {% elif not report %}
-  <div class="card rounded-2xl p-12 text-center max-w-lg mx-auto mt-8">
-    <div class="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-4">
-      <svg class="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-    </div>
-    <h3 class="text-lg font-semibold mb-2">No analysis yet</h3>
-    <p class="text-gray-400 text-sm mb-6">Click "Generate New Analysis" to get AI-powered insights powered by Claude.</p>
-    <form method="POST" action="/analysis/generate">
-      <button type="submit" class="btn-primary inline-flex items-center gap-2 text-white font-medium px-6 py-3 rounded-xl">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-        Generate Analysis
-      </button>
-    </form>
   </div>
 
   {% else %}
 
-  <!-- Score + Summary row -->
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+  <!-- Chat messages -->
+  <div class="flex-1 overflow-y-auto px-8 py-6 space-y-4" id="chatMessages">
 
-    <!-- Score ring -->
-    <div class="card rounded-2xl p-6 flex flex-col items-center justify-center text-center">
-      <p class="text-xs text-gray-500 uppercase tracking-wide mb-4">Account Health Score</p>
-      <div class="relative w-36 h-36 mb-4">
-        <svg class="w-full h-full -rotate-90" viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="10"/>
-          <circle cx="60" cy="60" r="50" fill="none"
-            stroke="{% if report.score >= 75 %}#4ade80{% elif report.score >= 50 %}#facc15{% else %}#f87171{% endif %}"
-            stroke-width="10" stroke-linecap="round"
-            stroke-dasharray="314"
-            stroke-dashoffset="{{ 314 - (314 * report.score / 100) }}"
-            class="score-ring"/>
-        </svg>
-        <div class="absolute inset-0 flex flex-col items-center justify-center">
-          <span class="text-4xl font-bold text-white">{{ report.score }}</span>
-          <span class="text-xs text-gray-400">/ 100</span>
+    <!-- Welcome message -->
+    {% if not messages %}
+    <div class="flex gap-3 justify-start">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-1">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      </div>
+      <div class="max-w-2xl">
+        <div class="bg-white/10 border border-white/15 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-200 leading-relaxed">
+          <p class="font-semibold text-white mb-2">👋 Hi! I'm Marketing Maestro, your Meta Ads AI advisor.</p>
+          <p class="mb-2">I have full visibility into your <strong>{{ connection.ad_account_name }}</strong> account data. Here's what I can help you with:</p>
+          <ul class="space-y-1 text-gray-300 list-none">
+            <li>📊 Analyze your campaign performance against 2024 benchmarks</li>
+            <li>💡 Identify your top opportunities and quick wins</li>
+            <li>💰 Optimize your budget allocation</li>
+            <li>🎯 Improve targeting and creative strategy</li>
+            <li>📈 Create a scaling plan for your best campaigns</li>
+          </ul>
+          <p class="mt-2 text-gray-400 text-xs">Ask me anything about your ads — or try one of the suggestions below.</p>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-2">
+          {% for suggestion in [
+            "Give me a full account analysis",
+            "Which campaigns should I pause?",
+            "How can I improve my ROAS?",
+            "What are my quick wins?",
+            "Analyze my budget allocation",
+          ] %}
+          <button onclick="sendSuggestion(this)" data-text="{{ suggestion }}"
+            class="text-xs bg-white/5 hover:bg-indigo-500/20 border border-white/15 hover:border-indigo-500/40 text-gray-300 hover:text-indigo-300 px-3 py-1.5 rounded-full transition-all">
+            {{ suggestion }}
+          </button>
+          {% endfor %}
         </div>
       </div>
-      <span class="text-lg font-semibold {% if report.score >= 75 %}text-green-400{% elif report.score >= 50 %}text-yellow-400{% else %}text-red-400{% endif %}">
-        {{ report.score_label }}
-      </span>
-      <p class="text-xs text-gray-500 mt-2">{{ report.date_range }}</p>
-      <p class="text-xs text-gray-600 mt-1">Generated {{ report.created_at.strftime('%b %d, %Y %I:%M %p') }}</p>
     </div>
+    {% endif %}
 
-    <!-- Key metrics assessment -->
-    <div class="card rounded-2xl p-6 lg:col-span-2">
-      <h3 class="text-sm font-semibold text-gray-300 mb-4">Metrics vs. 2024 Benchmarks</h3>
-      {% if report.key_metrics_assessment %}
-      <div class="space-y-3">
-        {% set label_map = {'ctr_performance': 'CTR', 'cpc_efficiency': 'CPC', 'cpm_health': 'CPM', 'roas_strength': 'ROAS'} %}
-        {% for key, val in report.key_metrics_assessment.items() %}
-        <div class="bg-white/5 rounded-xl p-3">
-          <div class="flex items-center justify-between mb-1">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-semibold text-white">{{ label_map.get(key, key.replace('_',' ').title()) }}</span>
-              <span class="text-xs px-2 py-0.5 rounded-full font-medium
-                {% if val.rating == 'high' %}bg-green-500/20 text-green-400{% elif val.rating == 'medium' %}bg-yellow-500/20 text-yellow-400{% else %}bg-red-500/20 text-red-400{% endif %}">
-                {{ val.rating|capitalize }}
-              </span>
-            </div>
-            <div class="flex items-center gap-3 text-xs">
-              {% if val.actual %}<span class="text-white font-mono">Yours: {{ val.actual }}</span>{% endif %}
-              {% if val.benchmark %}<span class="text-gray-500">Benchmark: {{ val.benchmark }}</span>{% endif %}
-            </div>
-          </div>
-          {% if val.note %}<p class="text-xs text-gray-500">{{ val.note }}</p>{% endif %}
-        </div>
-        {% endfor %}
+    <!-- Existing messages -->
+    {% for msg in messages %}
+    <div class="flex gap-3 {% if msg.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
+      {% if msg.role == 'assistant' %}
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-1">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      </div>
+      {% endif %}
+      <div class="max-w-2xl">
+        <div class="{% if msg.role == 'user' %}bg-indigo-600/40 border border-indigo-500/30 rounded-2xl rounded-tr-sm{% else %}bg-white/10 border border-white/15 rounded-2xl rounded-tl-sm{% endif %} px-4 py-3 text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">{{ msg.content }}</div>
+        <div class="text-xs text-gray-600 mt-1 {% if msg.role == 'user' %}text-right{% endif %}">{{ msg.created_at.strftime('%I:%M %p') }}</div>
+      </div>
+      {% if msg.role == 'user' %}
+      <div class="w-8 h-8 rounded-full btn-primary flex items-center justify-center flex-shrink-0 mt-1 text-xs font-bold">
+        {{ current_user.name[0].upper() }}
       </div>
       {% endif %}
     </div>
-  </div>
+    {% endfor %}
 
-  <!-- Executive Summary -->
-  <div class="card rounded-2xl p-6 mb-6">
-    <h3 class="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
-      <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-      Executive Summary
-    </h3>
-    <div class="text-gray-300 text-sm leading-relaxed space-y-3 prose prose-invert max-w-none">
-      {{ report.summary | safe }}
-    </div>
-  </div>
-
-  <!-- Quick Wins -->
-  {% if report.quick_wins %}
-  <div class="card rounded-2xl p-6 mb-6">
-    <h3 class="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
-      <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-      Quick Wins — Do These Today
-    </h3>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {% for win in report.quick_wins %}
-      <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
-        <p class="text-sm text-yellow-200">{{ win }}</p>
+    <!-- Typing indicator (hidden by default) -->
+    <div id="typingIndicator" class="flex gap-3 justify-start hidden">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
       </div>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-
-  <!-- Recommendations -->
-  {% if report.recommendations %}
-  <div class="card rounded-2xl p-6 mb-6">
-    <h3 class="text-sm font-semibold text-gray-300 mb-5 flex items-center gap-2">
-      <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-      Top Recommendations
-    </h3>
-    <div class="space-y-4">
-      {% for i, rec in enumerate(report.recommendations) %}
-      <div class="bg-white/5 border border-white/10 rounded-xl p-5">
-        <div class="flex items-start gap-4">
-          <div class="flex-shrink-0 w-8 h-8 rounded-full btn-primary flex items-center justify-center text-sm font-bold">
-            {{ i + 1 }}
-          </div>
-          <div class="flex-1">
-            <div class="flex items-center gap-2 mb-2">
-              <h4 class="text-white font-semibold text-sm">{{ rec.title }}</h4>
-              {% if rec.priority %}
-              <span class="text-xs px-2 py-0.5 rounded-full font-medium
-                {% if rec.priority == 'high' %}bg-red-500/20 text-red-400{% elif rec.priority == 'medium' %}bg-yellow-500/20 text-yellow-400{% else %}bg-blue-500/20 text-blue-400{% endif %}">
-                {{ rec.priority|capitalize }} Priority
-              </span>
-              {% endif %}
-            </div>
-            <p class="text-xs text-gray-500 mb-2"><span class="text-gray-400 font-medium">Issue:</span> {{ rec.issue }}</p>
-            <p class="text-xs text-gray-400 mb-2"><span class="text-white font-medium">Action:</span> {{ rec.action }}</p>
-            <p class="text-xs text-green-400"><span class="font-medium">Expected impact:</span> {{ rec.impact }}</p>
-          </div>
+      <div class="bg-white/10 border border-white/15 rounded-2xl rounded-tl-sm px-4 py-3">
+        <div class="flex gap-1 items-center h-4">
+          <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0ms"></div>
+          <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:150ms"></div>
+          <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:300ms"></div>
         </div>
       </div>
-      {% endfor %}
     </div>
+  </div>
+
+  <!-- Input area -->
+  <div class="flex-shrink-0 px-8 py-4 border-t border-white/10">
+    <form id="chatForm" class="flex gap-3 items-end">
+      <div class="flex-1 relative">
+        <textarea id="chatInput" placeholder="Ask me about your Meta Ads performance…" rows="1"
+          class="w-full bg-white/10 border border-white/20 rounded-2xl px-4 py-3 pr-12 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none"
+          style="max-height:120px"
+          onkeydown="handleKey(event)"></textarea>
+      </div>
+      <button type="submit" id="sendBtn"
+        class="btn-primary w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-50">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+        </svg>
+      </button>
+    </form>
+    <p class="text-xs text-gray-600 mt-2 text-center">Marketing Maestro · Powered by real-time Meta Ads data</p>
   </div>
   {% endif %}
 
-  <!-- Budget Optimization -->
-  {% if report.budget_optimization %}
-  <div class="card rounded-2xl p-6">
-    <h3 class="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
-      <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-      Budget Optimization
-    </h3>
-    <div class="text-gray-300 text-sm leading-relaxed prose prose-invert max-w-none">
-      {{ report.budget_optimization | safe }}
-    </div>
-  </div>
-  {% endif %}
-
-  {% endif %}
 </div>
+
+<script>
+function scrollToBottom() {
+  const el = document.getElementById('chatMessages');
+  if (el) el.scrollTop = el.scrollHeight;
+}
+scrollToBottom();
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); document.getElementById('chatForm').requestSubmit(); }
+}
+
+function sendSuggestion(btn) {
+  document.getElementById('chatInput').value = btn.dataset.text;
+  document.getElementById('chatForm').requestSubmit();
+}
+
+function addMessage(role, content) {
+  const container = document.getElementById('chatMessages');
+  const now = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+  const isUser = role === 'user';
+  const div = document.createElement('div');
+  div.className = `flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`;
+  div.innerHTML = isUser
+    ? `<div class="max-w-2xl"><div class="bg-indigo-600/40 border border-indigo-500/30 rounded-2xl rounded-tr-sm px-4 py-3 text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">${escHtml(content)}</div><div class="text-xs text-gray-600 mt-1 text-right">${now}</div></div><div class="w-8 h-8 rounded-full btn-primary flex items-center justify-center flex-shrink-0 mt-1 text-xs font-bold">{{ current_user.name[0].upper() }}</div>`
+    : `<div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 mt-1"><svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div><div class="max-w-2xl"><div class="bg-white/10 border border-white/15 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">${escHtml(content)}</div><div class="text-xs text-gray-600 mt-1">${now}</div></div>`;
+  container.insertBefore(div, document.getElementById('typingIndicator'));
+  scrollToBottom();
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+document.getElementById('chatForm')?.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('typingIndicator').classList.remove('hidden');
+  addMessage('user', msg);
+  scrollToBottom();
+  try {
+    const resp = await fetch('/analysis/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg})
+    });
+    const data = await resp.json();
+    document.getElementById('typingIndicator').classList.add('hidden');
+    if (data.error) { addMessage('assistant', '⚠️ ' + data.error); }
+    else { addMessage('assistant', data.reply); }
+  } catch(err) {
+    document.getElementById('typingIndicator').classList.add('hidden');
+    addMessage('assistant', '⚠️ Something went wrong. Please try again.');
+  }
+  document.getElementById('sendBtn').disabled = false;
+  scrollToBottom();
+});
+
+// Auto-resize textarea
+document.getElementById('chatInput')?.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+</script>
 
 {% endblock %}
