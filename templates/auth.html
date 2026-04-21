@@ -41,7 +41,12 @@
         </div>
 
         <div class="mb-6">
-          <label class="block text-sm font-medium text-gray-300 mb-2">Password</label>
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-sm font-medium text-gray-300">Password</label>
+            {% if mode == 'login' %}
+            <a href="/forgot-password" class="text-xs text-indigo-400 hover:text-indigo-300">Forgot password?</a>
+            {% endif %}
+          </div>
           <input type="password" name="password" required
             class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             placeholder="••••••••" />

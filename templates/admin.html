@@ -10,6 +10,36 @@
     </div>
   </div>
 
+  <!-- Pending reset requests -->
+  {% if pending_resets %}
+  <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-5 mb-6">
+    <h3 class="text-sm font-semibold text-yellow-300 mb-3 flex items-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+      Pending Password Reset Requests ({{ pending_resets|length }})
+    </h3>
+    <div class="space-y-2">
+      {% for r in pending_resets %}
+      <div class="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+        <div>
+          <span class="text-white text-sm font-medium">{{ r.user.name }}</span>
+          <span class="text-gray-400 text-sm ml-2">{{ r.user.email }}</span>
+          <span class="text-gray-600 text-xs ml-3">Requested {{ r.created_at.strftime('%b %d, %I:%M %p') }}</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <input readonly value="{{ base_url }}/reset-password/{{ r.token }}"
+            class="bg-white/5 border border-white/15 text-gray-300 text-xs rounded-lg px-3 py-1.5 w-72 font-mono"
+            onclick="this.select()" title="Click to select, then copy"/>
+          <button onclick="navigator.clipboard.writeText('{{ base_url }}/reset-password/{{ r.token }}'); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy',2000)"
+            class="bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 text-xs font-medium px-3 py-1.5 rounded-lg transition-all">
+            Copy
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Stats row -->
   <div class="grid grid-cols-3 gap-4 mb-8">
     {% set total = user_data|length %}
@@ -40,7 +70,7 @@
         <thead>
           <tr class="text-xs text-gray-500 uppercase tracking-wide border-b border-white/10 bg-white/5">
             <th class="text-left px-6 py-3">User</th>
-            <th class="text-left px-6 py-3">Joined</th>
+            <th class="text-left px-6 py-3">Joined / Last Login</th>
             <th class="text-left px-6 py-3">Meta Ads Account</th>
             <th class="text-center px-6 py-3">Reports</th>
             <th class="text-center px-6 py-3">Role</th>
@@ -69,9 +99,15 @@
                 </div>
               </div>
             </td>
-            <td class="px-6 py-4 text-gray-400 text-xs">
-              {{ u.created_at.strftime('%b %d, %Y') }}<br>
-              <span class="text-gray-600">{{ u.created_at.strftime('%I:%M %p') }}</span>
+            <td class="px-6 py-4 text-xs">
+              <div class="text-gray-400">{{ u.created_at.strftime('%b %d, %Y') }}</div>
+              <div class="text-gray-600 mt-1">
+                {% if u.last_login %}
+                  Last login: <span class="text-gray-400">{{ u.last_login.strftime('%b %d, %Y') }}</span>
+                {% else %}
+                  <span class="text-gray-600 italic">Never logged in</span>
+                {% endif %}
+              </div>
             </td>
             <td class="px-6 py-4">
               {% if conn %}

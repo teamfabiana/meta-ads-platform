@@ -8,7 +8,7 @@ from flask import Flask, render_template, redirect, url_for, request, flash, ses
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
 
-from models import db, User, MetaConnection, CampaignCache, AnalysisReport
+from models import db, User, MetaConnection, CampaignCache, AnalysisReport, PasswordResetToken
 from meta_api import (
     get_oauth_url, exchange_code_for_token, get_long_lived_token,
     get_fb_user, get_ad_accounts, sync_campaigns,
@@ -69,9 +69,14 @@ def login():
         password = request.form.get("password", "")
         user = User.query.filter_by(email=email).first()
         if user and user.check_password(password):
+            user.last_login = datetime.utcnow()
+            db.session.commit()
             login_user(user, remember=True)
             return redirect(url_for("dashboard"))
-        flash("Invalid email or password.", "error")
+        elif user:
+            flash("Wrong password. Try again or use 'Forgot password' below.", "error")
+        else:
+            flash("No account found with that email. Please register first.", "error")
     return render_template("auth.html", mode="login")
 
 
@@ -90,7 +95,7 @@ def register():
             flash("Password must be at least 8 characters.", "error")
             return render_template("auth.html", mode="register")
         if User.query.filter_by(email=email).first():
-            flash("An account with that email already exists.", "error")
+            flash("An account with that email already exists. Please log in instead.", "error")
             return render_template("auth.html", mode="register")
         user = User(name=name, email=email)
         user.set_password(password)
@@ -449,6 +454,49 @@ def _parse_report(report_obj):
     })()
 
 
+# ── Forgot / Reset Password ───────────────────────────────────────────────────
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        user = User.query.filter_by(email=email).first()
+        if user:
+            # Invalidate any existing tokens for this user
+            PasswordResetToken.query.filter_by(user_id=user.id, used=False).delete()
+            token = secrets.token_urlsafe(32)
+            reset = PasswordResetToken(user_id=user.id, token=token)
+            db.session.add(reset)
+            db.session.commit()
+        # Always show the same message (don't reveal if email exists)
+        return render_template("forgot_password.html", sent=True)
+    return render_template("forgot_password.html", sent=False)
+
+
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    reset = PasswordResetToken.query.filter_by(token=token, used=False).first()
+    if not reset or reset.is_expired():
+        return render_template("reset_password.html", invalid=True)
+
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm", "")
+        if len(password) < 8:
+            flash("Password must be at least 8 characters.", "error")
+            return render_template("reset_password.html", invalid=False, token=token)
+        if password != confirm:
+            flash("Passwords do not match.", "error")
+            return render_template("reset_password.html", invalid=False, token=token)
+        reset.user.set_password(password)
+        reset.used = True
+        db.session.commit()
+        flash("Password updated! You can now log in.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("reset_password.html", invalid=False, token=token)
+
+
 # ── Admin ─────────────────────────────────────────────────────────────────────
 
 def admin_required(f):
@@ -475,7 +523,19 @@ def admin_users():
             "connection": conn,
             "report_count": report_count,
         })
-    return render_template("admin.html", active_page="admin", user_data=user_data)
+    # Pending reset requests (not used, not expired)
+    pending_resets = [
+        r for r in PasswordResetToken.query.filter_by(used=False)
+        .order_by(PasswordResetToken.created_at.desc()).all()
+        if not r.is_expired()
+    ]
+    return render_template(
+        "admin.html",
+        active_page="admin",
+        user_data=user_data,
+        pending_resets=pending_resets,
+        base_url=BASE_URL,
+    )
 
 
 @app.route("/admin/reset/<int:user_id>", methods=["POST"])
