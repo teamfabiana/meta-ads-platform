@@ -230,26 +230,31 @@ def analysis():
 @app.route("/analysis/generate", methods=["POST"])
 @login_required
 def generate_analysis_route():
-    if not ANTHROPIC_API_KEY:
-        flash("Anthropic API key not configured. Add ANTHROPIC_API_KEY to your .env file.", "error")
-        return redirect(url_for("analysis"))
-
-    connection = MetaConnection.query.filter_by(user_id=current_user.id).first()
-    if not connection:
-        flash("Connect your Meta Ads account first.", "info")
-        return redirect(url_for("connect"))
-
-    campaigns = CampaignCache.query.filter_by(connection_id=connection.id).all()
-    if not campaigns:
-        flash("No campaign data found. Sync your account first.", "info")
-        return redirect(url_for("connect"))
-
     try:
+        if not ANTHROPIC_API_KEY:
+            flash("Anthropic API key not configured.", "error")
+            return redirect(url_for("analysis"))
+
+        connection = MetaConnection.query.filter_by(user_id=current_user.id).first()
+        if not connection:
+            flash("Connect your Meta Ads account first.", "info")
+            return redirect(url_for("connect"))
+
+        campaigns = CampaignCache.query.filter_by(connection_id=connection.id).all()
+        if not campaigns:
+            flash("No campaign data found. Sync your account first.", "info")
+            return redirect(url_for("connect"))
+
         result = generate_analysis(campaigns, connection, ANTHROPIC_API_KEY)
-        # Delete previous reports for this connection to keep DB clean
-        AnalysisReport.query.filter_by(
+
+        # Replace previous report
+        old = AnalysisReport.query.filter_by(
             user_id=current_user.id, connection_id=connection.id
-        ).delete()
+        ).first()
+        if old:
+            db.session.delete(old)
+            db.session.flush()
+
         report = AnalysisReport(
             user_id=current_user.id,
             connection_id=connection.id,
@@ -267,10 +272,12 @@ def generate_analysis_route():
         db.session.add(report)
         db.session.commit()
         flash("Analysis generated successfully!", "success")
+
     except Exception as e:
         import traceback
-        app.logger.error(f"Analysis error: {traceback.format_exc()}")
-        flash(f"Error generating analysis: {str(e)}", "error")
+        db.session.rollback()
+        app.logger.error(f"Analysis generation error:\n{traceback.format_exc()}")
+        flash(f"Analysis failed: {str(e)}", "error")
 
     return redirect(url_for("analysis"))
 
