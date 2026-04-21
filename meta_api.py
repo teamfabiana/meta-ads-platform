@@ -6,7 +6,7 @@ GRAPH_API_BASE = "https://graph.facebook.com/v19.0"
 
 
 def get_oauth_url(app_id, redirect_uri):
-    scope = "ads_read,ads_management,business_management,public_profile,email"
+    scope = "ads_read,ads_management,business_management,public_profile"
     return (
         f"https://www.facebook.com/dialog/oauth"
         f"?client_id={app_id}"
