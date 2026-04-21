@@ -28,11 +28,34 @@ if _db_url.startswith("postgres://"):
 app.config["SQLALCHEMY_DATABASE_URI"] = _db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+def _migrate_db():
+    """Add missing columns to existing tables without dropping data."""
+    is_postgres = "postgresql" in app.config["SQLALCHEMY_DATABASE_URI"]
+    with db.engine.connect() as conn:
+        migrations = [
+            ("user", "last_login", "TIMESTAMP" if is_postgres else "DATETIME"),
+            ("user", "is_admin", "BOOLEAN DEFAULT FALSE NOT NULL" if is_postgres else "BOOLEAN NOT NULL DEFAULT 0"),
+        ]
+        for table, column, col_type in migrations:
+            try:
+                if is_postgres:
+                    conn.execute(db.text(f"ALTER TABLE \"{table}\" ADD COLUMN IF NOT EXISTS {column} {col_type}"))
+                else:
+                    existing = [r[1] for r in conn.execute(db.text(f"PRAGMA table_info({table})")).fetchall()]
+                    if column not in existing:
+                        conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+            except Exception:
+                pass
+        conn.commit()
+
+
 db.init_app(app)
 
-# Create tables on startup — works with both gunicorn and direct python
+# Create tables and run migrations on startup
 with app.app_context():
     db.create_all()
+    # Add any missing columns that were added after initial deploy
+    _migrate_db()
 
 login_manager = LoginManager()
 login_manager.init_app(app)
