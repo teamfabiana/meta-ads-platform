@@ -246,6 +246,10 @@ def generate_analysis_route():
 
     try:
         result = generate_analysis(campaigns, connection, ANTHROPIC_API_KEY)
+        # Delete previous reports for this connection to keep DB clean
+        AnalysisReport.query.filter_by(
+            user_id=current_user.id, connection_id=connection.id
+        ).delete()
         report = AnalysisReport(
             user_id=current_user.id,
             connection_id=connection.id,
@@ -264,6 +268,8 @@ def generate_analysis_route():
         db.session.commit()
         flash("Analysis generated successfully!", "success")
     except Exception as e:
+        import traceback
+        app.logger.error(f"Analysis error: {traceback.format_exc()}")
         flash(f"Error generating analysis: {str(e)}", "error")
 
     return redirect(url_for("analysis"))
